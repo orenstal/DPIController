@@ -7,6 +7,7 @@ public class Test {
 	public static void main(String[] args) {
 
 		System.out.println("start init - by desktop");
+		System.out.println("desktop test");
 		int numOfMiddleBoxes = 4;
 		// create the middleboxes
 		Middlebox[] middleboxes = new Middlebox[numOfMiddleBoxes];
