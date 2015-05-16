@@ -1,4 +1,4 @@
-package OdlAddon;
+package DPIControllerApp;
 
 
 
@@ -765,17 +765,17 @@ public class DPIController {
 
 
 	// deprecated
-	public RETURN_VALUE setPatternsSet(PolicyChain policyChain, String newPatternSet) {
-		/*
-		 *  1. if (policyChain.getPatternsSet().contains(newPatternSet)), return SUCCESS.
-		 * 	2. else:
-		 * 		2.1. _registeredMiddleboxes[mb.getID()].setPatternSet(newPatternsSet);
-		 * 		2.2. policyChain.setPatternsSet(policyChain.getPatternsSet() + newPatternSet);
-		 * 		2.3. find the DPI instance (thread) for this policy chain from the thread pool, and return the value that is returned
-		 * 			 by calling to "updatePatternsSet()" of the DPI Instance (this means to rebuild the DFA for AC algorithm).
-		 */
-
-		return RETURN_VALUE.SUCCESS;
-	}
+//	public RETURN_VALUE setPatternsSet(PolicyChain policyChain, String newPatternSet) {
+//		/*
+//		 *  1. if (policyChain.getPatternsSet().contains(newPatternSet)), return SUCCESS.
+//		 * 	2. else:
+//		 * 		2.1. _registeredMiddleboxes[mb.getID()].setPatternSet(newPatternsSet);
+//		 * 		2.2. policyChain.setPatternsSet(policyChain.getPatternsSet() + newPatternSet);
+//		 * 		2.3. find the DPI instance (thread) for this policy chain from the thread pool, and return the value that is returned
+//		 * 			 by calling to "updatePatternsSet()" of the DPI Instance (this means to rebuild the DFA for AC algorithm).
+//		 */
+//
+//		return RETURN_VALUE.SUCCESS;
+//	}
 
 }

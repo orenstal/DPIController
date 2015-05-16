@@ -1,4 +1,4 @@
-package OdlAddon;
+package DPIControllerApp;
 
 import java.io.BufferedReader;
 import java.io.IOException;

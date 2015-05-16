@@ -1,4 +1,4 @@
-package OdlAddon;
+package DPIControllerApp;
 
 /**
  * This class represents a middlebox in the network.
