@@ -1,10 +1,30 @@
 package OdlAddon;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import org.json.*;
 
 public class Test {
+
+	private static final String COMMAND_STRING = "command";
+	// the commands must be in lower case !!
+	private static final String REGISTER_MIDDLEBOX_COMMAND = "registermiddleboxcommand";
+	private static final String ADD_POLICY_CHAIN_COMMAND = "addpolicychaincommand";
+	private static final String REMOVE_POLICY_CHAIN__COMMAND = "removepolicychaincommand";
+	private static final String SET_PATTERNS_SET_COMMAND = "setpatternssetcommand";
+	private static final String PRINT_DPI_CONTROLLER_STATUS_COMMAND = "printdpicontrollertatuscommand";
+
+	private static final String MIDDLEBOX_NAME_STRING = "middlebox name";
+	private static final String PATTERNS_SET_STRING = "patterns set";
+	private static final String FLOW_FLAG_BOOLEAN_STRING = "flow flag";
+	private static final String STEALTH_FLAG_BOOLEAN_STRING = "stealth flag";
+	private static final String POLICY_CHAIN_STRING = "policy chain";
 
 	public static void main(String[] args) {
 
@@ -54,8 +74,9 @@ public class Test {
 //		}
 
 
-		test1(middleboxes, middleboxesInPolicyChains);
+//		test1(middleboxes, middleboxesInPolicyChains);
 //		test2(middleboxes, middleboxesInPolicyChains, policyChains);
+		test3(middleboxes, middleboxesInPolicyChains);
 
 //		JSONObject obj = new JSONObject();
 //		try {
@@ -180,4 +201,257 @@ public class Test {
 //		System.out.println("done TEST 2");
 //		System.out.println("----------------------------------------------------------------------------------------");
 //	}
+
+	private static void sendAndPrint(int dpiPort, JSONObject jsonObj, String msgToPrint) {
+		Socket socket;
+		BufferedReader in = null;
+		PrintWriter out = null;
+		String retString = "";
+
+		try {
+			socket = new Socket("127.0.0.1", dpiPort);
+			in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			out = new PrintWriter(socket.getOutputStream(), true);
+		} catch (UnknownHostException e1) {
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+
+
+		try {
+
+			out.println(jsonObj);
+			String line = in.readLine();
+
+			if (line != null)
+				retString = line;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		System.out.println(msgToPrint + retString);
+	}
+
+
+
+	private static void test3(Middlebox[] middleboxes, String[] middleboxesInPolicyChains) {
+		System.out.println("start TEST 3");
+
+		int dpiPort = 9091;
+		new DPIController(dpiPort);
+
+		JSONObject jsonObj;
+
+
+		// 1. register first middlebox
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, REGISTER_MIDDLEBOX_COMMAND);
+			jsonObj.put(MIDDLEBOX_NAME_STRING, middleboxes[0].getName());
+			jsonObj.put(PATTERNS_SET_STRING, middleboxes[0].getPatternSet());
+			jsonObj.put(FLOW_FLAG_BOOLEAN_STRING, false);
+			jsonObj.put(STEALTH_FLAG_BOOLEAN_STRING, false);
+
+			sendAndPrint(dpiPort, jsonObj, "1. first register ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 2. register second middlebox
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, REGISTER_MIDDLEBOX_COMMAND);
+			jsonObj.put(MIDDLEBOX_NAME_STRING, middleboxes[1].getName());
+			jsonObj.put(PATTERNS_SET_STRING, middleboxes[1].getPatternSet());
+			jsonObj.put(FLOW_FLAG_BOOLEAN_STRING, false);
+			jsonObj.put(STEALTH_FLAG_BOOLEAN_STRING, false);
+
+			sendAndPrint(dpiPort, jsonObj, "2. second register ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 3. first print status
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, PRINT_DPI_CONTROLLER_STATUS_COMMAND);
+
+			sendAndPrint(dpiPort, jsonObj, "3. print status ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+		// 4. add first policy chain
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, ADD_POLICY_CHAIN_COMMAND);
+			jsonObj.put(POLICY_CHAIN_STRING, middleboxesInPolicyChains[0]);
+
+			sendAndPrint(dpiPort, jsonObj, "4. first adding policy chain ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 5. add second policy chain
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, ADD_POLICY_CHAIN_COMMAND);
+			jsonObj.put(POLICY_CHAIN_STRING, middleboxesInPolicyChains[1]);
+
+			sendAndPrint(dpiPort, jsonObj, "5. second adding policy chain ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 6. second print status
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, PRINT_DPI_CONTROLLER_STATUS_COMMAND);
+
+			sendAndPrint(dpiPort, jsonObj, "6. print status ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 7. register third middlebox
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, REGISTER_MIDDLEBOX_COMMAND);
+			jsonObj.put(MIDDLEBOX_NAME_STRING, middleboxes[2].getName());
+			jsonObj.put(PATTERNS_SET_STRING, middleboxes[2].getPatternSet());
+			jsonObj.put(FLOW_FLAG_BOOLEAN_STRING, false);
+			jsonObj.put(STEALTH_FLAG_BOOLEAN_STRING, false);
+
+			sendAndPrint(dpiPort, jsonObj, "7. third register ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 8. register fourth middlebox
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, REGISTER_MIDDLEBOX_COMMAND);
+			jsonObj.put(MIDDLEBOX_NAME_STRING, middleboxes[3].getName());
+			jsonObj.put(PATTERNS_SET_STRING, middleboxes[3].getPatternSet());
+			jsonObj.put(FLOW_FLAG_BOOLEAN_STRING, false);
+			jsonObj.put(STEALTH_FLAG_BOOLEAN_STRING, false);
+
+			sendAndPrint(dpiPort, jsonObj, "8. fourth register ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 9. add third policy chain
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, ADD_POLICY_CHAIN_COMMAND);
+			jsonObj.put(POLICY_CHAIN_STRING, middleboxesInPolicyChains[2]);
+
+			sendAndPrint(dpiPort, jsonObj, "9. third adding policy chain ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 10. add fourth policy chain
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, ADD_POLICY_CHAIN_COMMAND);
+			jsonObj.put(POLICY_CHAIN_STRING, middleboxesInPolicyChains[3]);
+
+			sendAndPrint(dpiPort, jsonObj, "10. fourth adding policy chain ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 11. third print status
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, PRINT_DPI_CONTROLLER_STATUS_COMMAND);
+
+			sendAndPrint(dpiPort, jsonObj, "11. print third ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		System.out.println("start removing...");
+
+		// 12. remove first policy chain
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, REMOVE_POLICY_CHAIN__COMMAND);
+			jsonObj.put(POLICY_CHAIN_STRING, "inst2," + middleboxesInPolicyChains[2]);
+
+			sendAndPrint(dpiPort, jsonObj, "12. first removing policy chain ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 13. third print status
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, PRINT_DPI_CONTROLLER_STATUS_COMMAND);
+
+			sendAndPrint(dpiPort, jsonObj, "13. print fourth ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 14. first set patterns set
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, SET_PATTERNS_SET_COMMAND);
+			jsonObj.put(MIDDLEBOX_NAME_STRING, middleboxes[0].getName());
+			jsonObj.put(PATTERNS_SET_STRING, "2,3");
+
+			sendAndPrint(dpiPort, jsonObj, "14. first setting patterns set ret val: ");
+			System.out.println("");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+
+		// 15. fifth print status
+		jsonObj = new JSONObject();
+		try {
+			jsonObj.put(COMMAND_STRING, PRINT_DPI_CONTROLLER_STATUS_COMMAND);
+
+			sendAndPrint(dpiPort, jsonObj, "15. print fifth ret val: ");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+		System.out.println("done TEST 3");
+		System.out.println("----------------------------------------------------------------------------------------");
+
+	}
+
 }

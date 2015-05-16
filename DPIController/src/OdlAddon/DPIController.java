@@ -8,6 +8,11 @@ package OdlAddon;
  * policy chain).
  */
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,7 +27,54 @@ import org.json.*;
 
 
 /*
+ * TODO: Flow to run the DPI Controller over the mininet and RYU:
+ * 	1. run the DPI Controller (java application):
+ * 		- you should send the port of the DPI Controller.
+ * 		- you should put the config file in the right place - TODO: not in the ryu ??
+ *
+ * 	2. run RYU with simple_switch.py app and tsa.py app
+ *
+ * 	3. run rest_topology.py - complete this part!! it allows me to know the network
+ * 	   topology..
+ */
+
+/*
+ * TODO: Open Issues:
+ * 	1. tsa.py:
+ * 		- I should change the behavior of the firewall such that it sends requests to
+ * 		  the controller.
+ *
+ * 		- change the action option. More specifically, instead of allows only 'Allow' or
+ * 		  'Deny', i should allow the 'outPort'.
+ *
+ * 		- I should create a configuration file which includes the following informations:
+ * 			- the required data to create new middleboxes.
+ * 			- the available policies chains.
+ * 		  Note that this file will be read only once (its goal is to easy the first
+ * 		  configuration process, because we can do all of its abilities with the command
+ * 		  line below.
+ *
+ * 		- I should create a command line which allows to:
+ * 			- add/remove policy chain.
+ * 			- register new middlebox.
+ * 			- update the middlebox's patterns set.
+ *
+ * 		- I should create HTTP Requests to the TSA app (instead of the json requests).
+ *
+ * 	2. DPIController.java:
+ * 		- implement all the todo's.
+ *
+ * 		- I should implement a function that receives json message from the tsa.py with
+ * 		  the required command to execute (like addPolicyChain, registerMiddlebox, etc.)
+ *
+ *
+ *
+ */
+
+
+/*
  * good tutorial: http://tutorials.jenkov.com/java-concurrency/index.html
+ * good example: http://cs.lmu.edu/~ray/notes/javanetexamples/
  *
  * my general design
  * while(dpiController is active){
@@ -30,26 +82,6 @@ import org.json.*;
     hand request to worker thread
     }
  */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// NEW DESIGN PROPOSAL:
-
-/*
- *
- * good example: http://cs.lmu.edu/~ray/notes/javanetexamples/
- *
- *
- * lets define the possible commands:
- * - "create instance [='addPolicyChain'], name=X".
- * - "setPatternsSet=X".
- * - "addPatternsSet=X" (same as "updatePatternsSet" command).
- * - "remove policyChain=X".
- * - "register middlebox=X".
- */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 
 public class DPIController {
@@ -96,6 +128,20 @@ public class DPIController {
 	private static final int maxInst = 10;
 	private static final int maxMB = 10;
 
+	private static final String COMMAND_STRING = "command";
+	// the commands must be in lower case !!
+	private static final String REGISTER_MIDDLEBOX_COMMAND = "registermiddleboxcommand";
+	private static final String ADD_POLICY_CHAIN_COMMAND = "addpolicychaincommand";
+	private static final String REMOVE_POLICY_CHAIN__COMMAND = "removepolicychaincommand";
+	private static final String SET_PATTERNS_SET_COMMAND = "setpatternssetcommand";
+	private static final String PRINT_DPI_CONTROLLER_STATUS_COMMAND = "printdpicontrollertatuscommand";
+
+	private static final String MIDDLEBOX_NAME_STRING = "middlebox name";
+	private static final String PATTERNS_SET_STRING = "patterns set";
+	private static final String FLOW_FLAG_BOOLEAN_STRING = "flow flag";
+	private static final String STEALTH_FLAG_BOOLEAN_STRING = "stealth flag";
+	private static final String POLICY_CHAIN_STRING = "policy chain";
+
 
 
 	public DPIController(int port) {
@@ -111,6 +157,15 @@ public class DPIController {
 		_MBsDpiInstanceMatrix = new int[maxMB+1][maxInst];
 
 		_availableIndices = new ConcurrentLinkedQueue<Integer>();
+
+		Thread serverThread = new Thread(new Runnable() {
+		     @Override
+			public void run() {
+		    	 startServer();
+		     }
+		});
+
+		serverThread.start();
 	}
 
 //	public synchronized void init() {
@@ -122,8 +177,43 @@ public class DPIController {
 //		 */
 //	}
 
+	private void startServer() {
+
+		ServerSocket listener;
+		try {
+			listener = new ServerSocket(_port);
+
+			try {
+	            while (true) {
+	                Socket socket = listener.accept();
+	                try {
+	                	 BufferedReader in = new BufferedReader(
+	                             new InputStreamReader(socket.getInputStream()));
+
+	                	 String returnedJsonMessage = executeCommand(in.readLine());
+
+	                	 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+	                    out.println(returnedJsonMessage);
+	                } catch (Exception e) {
+	                	System.out.println("an error occured !!");
+	                	e.printStackTrace();
+	                } finally {
+	                    socket.close();
+	                }
+	            }
+	        }
+	        finally {
+	            listener.close();
+	        }
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		System.out.println("DPI server is up on port: " + _port);
+
+	}
+
 	// TODO: add threads, 'synchronization' and lock common data structures to the implementations !!!!
-	// TODO: should i use callbacks??
 
 
 
@@ -138,12 +228,12 @@ public class DPIController {
 	 * 	1.3. else: try again. if failed in the second time or time expired for this call, return FAILED.
 	 */
 	/**
-	 * Let middleboxes to register for the DPI service. if the middlebox is alredy registered, nothing will happened.
+	 * Let middleboxes to register for the DPI service. if the middlebox is already registered, nothing will happened.
 	 * In case that SUCCESS is returned, the pattern set checking will take place after DPIController.WAIT_TIME_TO_START
 	 * seconds.
 	 * NOTE: All the packets that were sent and will be sent the next DPIController.WAIT_TIME_TO_START seconds after
 	 * RETURN_VALUE.SUCCESS is received by the middlebox, will not be checked by the DPI service.
-	 * Note: could be a situtaion where the middlebox has been listed in some existing policy chain, but the middlebox
+	 * Note: could be a situation where the middlebox has been listed in some existing policy chain, but the middlebox
 	 * didn't register until now (so it's pattern set are not scanned by the DPI instance). Therefore, we need to update
 	 * the pattern set for this policy chain (i.e. update the DFA representing this policy chain).
 	 * @param mb this object represents the middlebox object. mainly, it's id and required patterns set.
@@ -194,9 +284,6 @@ public class DPIController {
 		}
 
 		String newPolicyChain = addDPIInstanceToPolicyChain(policyChain, dpiInstanceName);
-
-		sendMessageToTSA("replace policy chain: ;" + policyChain + "; with: ;" + newPolicyChain);
-
 		return newPolicyChain;
 	}
 
@@ -288,7 +375,7 @@ public class DPIController {
 	// the function receives the policy chain and the selected dpi instance, and return a new policy chain in
 	// which the dpi instance is part of the policy chain
 	private String addDPIInstanceToPolicyChain (String policyChain, String dpiInstanceName) {
-		// TODO maybe i should get better dicision on *where* to add it
+		// TODO maybe i should get better decision on *where* to add it
 		return dpiInstanceName + "," + policyChain;
 	}
 
@@ -301,16 +388,6 @@ public class DPIController {
 	private void sendMessageToDPIInstanceServer (String message) {
 		// TODO not implemented yet
 		System.out.println("send the following message to DPI Instance server: '" + message + "'");
-	}
-
-	private void sendMessageToOpenFlowController (String message) {
-		// TODO not implemented yet
-		System.out.println("send the following message to Open Flow controller: '" + message + "'");
-	}
-
-	private void sendMessageToMiddlebox (String message, Socket socket, String mbName) {
-		// TODO not implemented yet
-		System.out.println("send the following message to mb '" + mbName + "': '" + message + "'");
 	}
 
 
@@ -383,7 +460,6 @@ public class DPIController {
 
 		System.out.println("set pattern set of '" + mbName +"' from: '" + mb.getPatternSet() + "' to: '" + newPatternsSet + "'");
 		if (mb.getPatternSet().equals(newPatternsSet)) {
-			sendMessageToMiddlebox("the new pattern set is equals to the old one",  null,  mb.getName());
 			return RETURN_VALUE.ALREADY_EXIST;
 		}
 
@@ -402,67 +478,63 @@ public class DPIController {
 	}
 
 
+	public String executeCommand(String msgAsString) {
+		System.out.println("~ executeCommand: received: " + msgAsString);
+		RETURN_VALUE ret = RETURN_VALUE.SUCCESS;
+		JSONObject returnJson = new JSONObject();
 
-	// command line for the DPI Controller
-	public void commandLine(String[] splittedCommand) {
-		String command = splittedCommand[1];
-		if (command.equalsIgnoreCase("addPolicyChain")) {
-			// bla bla
-		}
-		else if (command.equalsIgnoreCase("removePolicyChain")) {
-			// bla bla
-		}
-		// .....
-	}
-
-
-	private void handleRequest(String msgAsString) {
 		try {
 
 			JSONObject msg = new JSONObject(msgAsString);
-			String className = msg.getString("className");
+			String command = msg.getString(COMMAND_STRING);
 
-			String mbName = msg.getString("name");
+			returnJson.put("answer to command", command);
 
-			switch (className.toLowerCase()) {
-				case "middleboxregister":
+			switch (command.toLowerCase()) {
+				case REGISTER_MIDDLEBOX_COMMAND:
+					String mbName = msg.getString(MIDDLEBOX_NAME_STRING);
+					String patternsSet = msg.getString(PATTERNS_SET_STRING);
+					boolean isFlow = msg.getBoolean(FLOW_FLAG_BOOLEAN_STRING);
+					boolean isStealth = msg.getBoolean(STEALTH_FLAG_BOOLEAN_STRING);
 
-					String id = msg.getString("id");
-					boolean isFlow = msg.getBoolean("flow flag");
-					boolean isStealth = msg.getBoolean("stealth flag");
-
-					register(mbName, "", isFlow, isStealth);
+					ret = register(mbName, patternsSet, isFlow, isStealth);
 					break;
 
-				case "middleboxrulesetadd":
-					String newRules = msg.getString("rules");
+				case ADD_POLICY_CHAIN_COMMAND:
+					String policyChainToAdd = msg.getString(POLICY_CHAIN_STRING);
+					String newPolicyChain = addPolicyChain(policyChainToAdd);
 
-					setPatternsSet(mbName, newRules);
+					returnJson.put("old policy chain", policyChainToAdd);
+					returnJson.put("new policy chain", newPolicyChain);
 					break;
 
-				case "middleboxrulesetremove":	// ????
-
-					break;
-
-				case "middleboxderegister":	// TODO implement
-
-					break;
-
-				case "rulestats":	// TODO implement
+				case REMOVE_POLICY_CHAIN__COMMAND:
+					String policyChainToRemove = msg.getString(POLICY_CHAIN_STRING);
+					ret = removePolicyChain(policyChainToRemove);
 
 					break;
 
-				case "rulestatsresponse":	// TODO implement
+				case SET_PATTERNS_SET_COMMAND:
+					mbName = msg.getString(MIDDLEBOX_NAME_STRING);
+					patternsSet = msg.getString(PATTERNS_SET_STRING);
 
+					ret = setPatternsSet(mbName, patternsSet);
 					break;
 
+				case PRINT_DPI_CONTROLLER_STATUS_COMMAND:
+					printStatus();
+					break;
 			}
+
+			returnJson.put("return value", ret.toString());
 
 
 		} catch (JSONException e) {
 			System.out.println("invalid message (json) format");
 			e.printStackTrace();
 		}
+
+		return returnJson.toString();
 	}
 
 
@@ -493,9 +565,21 @@ public class DPIController {
 	}
 
 
+
+
 	////---------------- Needless --------------------
 
-	// kill all the DPI instances related to the received policy chain
+//	private void sendMessageToOpenFlowController (String message) {
+//		// TODO not implemented yet
+//		System.out.println("send the following message to Open Flow controller: '" + message + "'");
+//	}
+//
+//	private void sendMessageToMiddlebox (String message, Socket socket, String mbName) {
+//		// TODO not implemented yet
+//		System.out.println("send the following message to mb '" + mbName + "': '" + message + "'");
+//	}
+//
+//	 kill all the DPI instances related to the received policy chain
 //	private void killAllDPIInstancesForPolicyChain(PolicyChain policyChain) {
 //
 //		ConcurrentLinkedQueue<DPIInstance> dpiInstances = _activeDpiInstances.get(policyChain);
