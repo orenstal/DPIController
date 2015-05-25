@@ -14,11 +14,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.ListIterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -54,20 +49,11 @@ import org.json.*;
  * 		  configuration process, because we can do all of its abilities with the command
  * 		  line below.
  *
- * 		- I should create a command line which allows to:
- * 			- add/remove policy chain.
- * 			- register new middlebox.
- * 			- update the middlebox's patterns set.
- *
- * 		- I should create HTTP Requests to the TSA app (instead of the json requests).
+ * 		- I should create and send json requests to the DPIController app. Examples
+ * 		  are available in "test3".
  *
  * 	2. DPIController.java:
  * 		- implement all the todo's.
- *
- * 		- I should implement a function that receives json message from the tsa.py with
- * 		  the required command to execute (like addPolicyChain, registerMiddlebox, etc.)
- *
- *
  *
  */
 
@@ -144,6 +130,11 @@ public class DPIController {
 
 
 
+	public static void main(String[] args) {
+		int dpiPort = 9091;
+		new DPIController(dpiPort);
+
+	}
 	public DPIController(int port) {
 		_ipAddrr = "127.0.0.1";
 		_port = port;
@@ -158,6 +149,8 @@ public class DPIController {
 
 		_availableIndices = new ConcurrentLinkedQueue<Integer>();
 
+		System.out.println("start DPI controller..");
+
 		Thread serverThread = new Thread(new Runnable() {
 		     @Override
 			public void run() {
@@ -168,14 +161,6 @@ public class DPIController {
 		serverThread.start();
 	}
 
-//	public synchronized void init() {
-//		// TODO: implement commandline and:
-//		/*
-//		 * while(dpiController is active){
-//    	   listen for request
-//    	   hand request to worker thread
-//		 */
-//	}
 
 	private void startServer() {
 
@@ -186,11 +171,16 @@ public class DPIController {
 			try {
 	            while (true) {
 	                Socket socket = listener.accept();
+                    System.out.println("accept socket !");
 	                try {
+                         System.out.println("1");
 	                	 BufferedReader in = new BufferedReader(
 	                             new InputStreamReader(socket.getInputStream()));
+                         System.out.println("2");
 
-	                	 String returnedJsonMessage = executeCommand(in.readLine());
+                         String val = in.readLine();
+                         System.out.println("val: " + val);
+                         String returnedJsonMessage = executeCommand(val);
 
 	                	 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 	                    out.println(returnedJsonMessage);
@@ -380,13 +370,7 @@ public class DPIController {
 	}
 
 
-	private void sendMessageToTSA (String message) {
-		// TODO not implemented yet
-		System.out.println("send the following message to TSA: '" + message + "'");
-	}
-
 	private void sendMessageToDPIInstanceServer (String message) {
-		// TODO not implemented yet
 		System.out.println("send the following message to DPI Instance server: '" + message + "'");
 	}
 
@@ -490,6 +474,8 @@ public class DPIController {
 
 			returnJson.put("answer to command", command);
 
+            System.out.println("command is: " + command.toLowerCase());
+
 			switch (command.toLowerCase()) {
 				case REGISTER_MIDDLEBOX_COMMAND:
 					String mbName = msg.getString(MIDDLEBOX_NAME_STRING);
@@ -522,6 +508,7 @@ public class DPIController {
 					break;
 
 				case PRINT_DPI_CONTROLLER_STATUS_COMMAND:
+                    System.out.println("in print status");
 					printStatus();
 					break;
 			}
